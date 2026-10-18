@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>AttendNest - A Smart Attendance Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta name="title" content="AttendNest - Smart Attendance Tracker for Students">
+  <meta name="description" content="AttendNest helps college students track attendance, manage weekly timetable, and get smart reminders. A simple, offline-first PWA for students.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("service-worker.js");
+    });
+  }
+</script>
+
+<body>
+
+  <!-- ================= TOP BAR (HEADER & THEME TOGGLE) ================= -->
+  <div class="top-bar" style="margin-top: 10px; margin-bottom: 20px; padding: 0 8px;">
+    <h1 style="margin: 0; text-align: left; font-size: 1.6rem;">🗓️ AttendNest</h1>
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="theme-toggle-switch" title="Toggle Dark/Light Mode" aria-label="Toggle Dark/Light Mode">
+      <div class="switch-track">
+        <!-- Sun icon (visible in light mode / left side) -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="switch-icon sun-icon">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <!-- Moon icon (visible in dark mode / right side) -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="switch-icon moon-icon">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        <!-- Sliding Knob -->
+        <div class="switch-knob"></div>
+      </div>
+    </button>
+  </div>
+
+  <!-- ================= HOME / LANDING ================= -->
+  <div id="subject-screen">
+
+    <div class="add-subject">
+      <input type="text" id="newSubjectInput" placeholder="Enter subject name">
+      <button onclick="openAddSubjectModal()">Add Subject</button>
+    </div>
+
+     <div class="view-buttons">
+       <button id="btnTodayView" onclick="showTodaySubjects()" style="flex:1;">
+         📅 Today’s Classes
+       </button>
+       <button id="btnAllView" onclick="renderAllSubjects()" style="flex:1;">
+         📚 View All Subjects
+       </button>
+     </div>
+
+     <div style="max-width: 380px; margin: 0 auto 16px auto; padding: 0 4px;">
+       <button onclick="openImportModal()" class="btn-secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: 12px; font-weight: 600;">
+         📄 Import Timetable✨
+       </button>
+     </div>
+
+    <!-- ================= TARGET GOAL ================= -->
+    <div class="target-goal-container">
+      <span class="target-goal-label">🎯 Target Attendance:</span>
+      <div class="target-goal-input-wrapper">
+        <input type="number" id="targetGoalInput" min="50" max="100" value="75" onchange="updateTargetGoal(this.value)">
+        <span class="target-goal-percent">%</span>
+      </div>
+    </div>
+
+    <h2>Your Subjects</h2>
+    <div id="subjectList"></div>
+  </div>
+
+  <!-- ================= SUBJECT / CALENDAR ================= -->
+  <div id="calendar-screen" class="hidden">
+
+    <div id="reminderBanner" class="hidden"
+      style="background:#fef3c7; padding:10px; border-radius:8px;
+      margin:10px 0; color:#92400e; font-weight:500;">
+      🔔 You haven’t marked attendance for today.
+    </div>
+
+    <div class="calendar-header-actions">
+      <button onclick="goBack()" class="btn-secondary">⬅ Back</button>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-secondary" onclick="openEditSubjectModal()">✏️ Edit Subject</button>
+        <button class="btn-danger" onclick="openDeleteSubjectModal()">🗑 Delete Subject</button>
+      </div>
+    </div>
+
+    <h2 id="currentSubjectTitle" style="text-align: center; margin: 16px 0 8px 0;"></h2>
+
+    <div class="stats-container">
+      <div class="stat-card">
+        <span class="stat-value" id="attendedCount">0</span>
+        <span class="stat-label">Attended</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="totalCount">0</span>
+        <span class="stat-label">Total</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="percentage">0%</span>
+        <span class="stat-label">Percent</span>
+      </div>
+    </div>
+
+    <!-- Bunk Calculator Card -->
+    <div id="bunkCalculatorCard" class="bunk-card hidden"></div>
+
+    <div id="monthControls">
+      <button onclick="prevMonth()">◀</button>
+      <span id="monthHeader"></span>
+      <button onclick="nextMonth()">▶</button>
+    </div>
+
+    <div id="calendar-container">
+      <div id="weekdays">
+        <div>Mon</div><div>Tue</div><div>Wed</div>
+        <div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+      </div>
+      <div id="calendar"></div>
+    </div>
+
+  </div>
+
+  <!-- ================= STATUS MODAL ================= -->
+  <div id="statusModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Select Status</h3>
+      <button class="btn present-btn" onclick="setStatus('present')">✅ Present</button>
+      <button class="btn absent-btn" onclick="setStatus('absent')">❌ Absent</button>
+      <button class="btn noclass-btn" onclick="setStatus('noclass')">🟦 No Class</button>
+      <button class="btn clear-btn" onclick="setStatus('clear')">⭕ Clear</button>
+      <br><br>
+      <button class="btn cancel-btn" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ================= ADD SUBJECT MODAL ================= -->
+  <div id="addSubjectModal" class="modal hidden">
+    <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
+      <h3>Add Subject</h3>
+
+      <p>Select Class Days:</p>
+
+      <div id="multiDaySelector"
+        style="display:grid; grid-template-columns: repeat(3, 1fr); gap:5px;">
+        <button class="btn day-btn" data-day="1">Mon</button>
+        <button class="btn day-btn" data-day="2">Tue</button>
+        <button class="btn day-btn" data-day="3">Wed</button>
+        <button class="btn day-btn" data-day="4">Thu</button>
+        <button class="btn day-btn" data-day="5">Fri</button>
+        <button class="btn day-btn" data-day="6">Sat</button>
+        <button class="btn day-btn" data-day="0">Sun</button>
+      </div>
+
+      <!-- Container for dynamic time inputs -->
+      <div id="timingInputsContainer"></div>
+
+      <br>
+      <button class="btn present-btn" onclick="saveSelectedDays()">Save Days</button>
+      <button class="btn cancel-btn" onclick="closeAddSubjectModal()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ================= EDIT SUBJECT MODAL ================= -->
+  <div id="editSubjectModal" class="modal hidden">
+    <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
+      <h3>Edit Subject</h3>
+
+      <input type="text" id="editSubjectNameInput" placeholder="Enter subject name" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 12px; font-family: inherit; font-size: 15px; font-weight: 500; outline: none; background: var(--bg-secondary); color: var(--text-primary);">
+
+      <p>Select Class Days:</p>
+
+      <div id="editMultiDaySelector"
+        style="display:grid; grid-template-columns: repeat(3, 1fr); gap:5px;">
+        <button class="btn day-btn edit-day-btn" data-day="1">Mon</button>
+        <button class="btn day-btn edit-day-btn" data-day="2">Tue</button>
+        <button class="btn day-btn edit-day-btn" data-day="3">Wed</button>
+        <button class="btn day-btn edit-day-btn" data-day="4">Thu</button>
+        <button class="btn day-btn edit-day-btn" data-day="5">Fri</button>
+        <button class="btn day-btn edit-day-btn" data-day="6">Sat</button>
+        <button class="btn day-btn edit-day-btn" data-day="0">Sun</button>
+      </div>
+
+      <!-- Container for dynamic time inputs -->
+      <div id="editTimingInputsContainer"></div>
+
+      <br>
+      <button class="btn present-btn" onclick="saveEditSubject()">Save Changes</button>
+      <button class="btn cancel-btn" onclick="closeEditSubjectModal()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ================= DELETE SUBJECT MODAL ================= -->
+  <div id="deleteSubjectModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Delete Subject?</h3>
+      <p>This will remove all attendance data for this subject.</p>
+      <button class="btn absent-btn" onclick="deleteSubject()">Yes, Delete</button>
+      <button class="btn cancel-btn" onclick="closeDeleteSubjectModal()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ================= SELECTION DELETE BUTTON ================= -->
+  <button id="selectionDeleteBtn" class="btn-danger selection-delete-btn hidden" onclick="deleteSelectedSubjects()">🗑 Delete</button>
+
+  <!-- ================= IMPORT TIMETABLE MODAL ================= -->
+  <div id="importTimetableModal" class="modal hidden">
+    <div class="modal-content" style="max-height: 90vh; overflow-y: auto; width: 90%; max-width: 500px;">
+      <h3>📄 Import Timetable</h3>
+
+      <!-- Setup/Upload View -->
+      <div id="importSetupView">
+        <p style="text-align: left; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px;">Select Timetable File (PDF or Image):</p>
+        <input type="file" id="timetableFileInput" accept=".pdf, .png, .jpg, .jpeg" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px dashed var(--border-color); margin-bottom: 20px; font-family: inherit; font-size: 14px; background: var(--bg-primary); color: var(--text-primary); cursor: pointer;">
+
+        <button class="btn present-btn" onclick="startAIImport()">Start Parsing</button>
+        <button class="btn cancel-btn" onclick="closeImportModal()">Cancel</button>
+      </div>
+
+      <!-- Loading View -->
+      <div id="importLoadingView" class="hidden" style="text-align:center; padding: 20px 0;">
+        <div class="spinner" style="margin: 0 auto 16px auto;"></div>
+        <div id="importProgressText" style="font-weight:600; font-size:15px; color:var(--text-primary);">Reading PDF...</div>
+      </div>
+
+      <!-- Preview View -->
+      <div id="importPreviewView" class="hidden" style="text-align: left;">
+        <p style="font-size: 13px; font-weight: 600; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 8px; margin-bottom: 12px; line-height: 1.4;">⚠️ AI may occasionally make mistakes while reading your timetable. Please review and edit the subjects, class days, and timings before adding.</p>
+        
+        <div id="importPreviewList" style="max-height: 45vh; overflow-y: auto; margin-bottom: 16px; padding-right: 4px;"></div>
+
+        <button class="btn-secondary" onclick="addPreviewSubjectManually()" style="width: 100%; padding: 10px; margin-bottom: 16px; font-weight: 600; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 6px; font-family: inherit; cursor: pointer;">➕ Add Subject Manually</button>
+
+        <button class="btn present-btn" onclick="importSubjects()">Import Subjects</button>
+        <button class="btn cancel-btn" onclick="showImportSetup()">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= DUPLICATE RESOLUTION MODAL ================= -->
+  <div id="duplicateModal" class="modal hidden" style="z-index: 150;">
+    <div class="modal-content">
+      <h3 id="duplicateTitle">Subject already exists</h3>
+      <p id="duplicateText" style="margin-bottom: 20px;"></p>
+      <button class="btn present-btn" id="btnReplaceDuplicate" style="margin-bottom: 8px;">Replace Config (Keep Logs)</button>
+      <button class="btn present-btn" id="btnRenameDuplicate" style="background:#2563eb; margin-bottom: 8px;">Rename Subject</button>
+      <button class="btn cancel-btn" id="btnSkipDuplicate">Skip Import</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.3/dist/tesseract.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
